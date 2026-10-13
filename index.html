@@ -1,0 +1,511 @@
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>덕질 지도</title>
+<style>
+:root{--purple:#7465e8;--line:#e8e8ef;--ink:#24243a}
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,"Malgun Gothic",sans-serif;color:var(--ink)}
+button,input{font:inherit}
+button{cursor:pointer}
+.app{display:flex;height:100vh;min-height:500px}
+.sidebar{width:420px;max-width:48vw;display:flex;flex-direction:column;background:white;border-right:1px solid var(--line);z-index:2}
+header{padding:20px;border-bottom:1px solid var(--line)}
+h1{margin:0;font-size:23px}
+.subtitle{margin-top:5px;color:#777;font-size:12px}
+.search-form{display:flex;gap:8px;margin-top:15px}
+#searchInput{flex:1;min-width:0;padding:12px;border:1px solid #ddd;border-radius:10px}
+.primary{border:0;border-radius:10px;background:#fee500;padding:0 15px;font-weight:bold}
+.tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:12px;border-bottom:1px solid var(--line)}
+.tab{padding:11px 8px;text-align:left;border:1px solid var(--line);border-radius:10px;background:white;font-size:13px}
+.tab.active{background:#f2f0ff;border-color:var(--purple);color:#5144c6;font-weight:bold}
+.banner{margin:12px;padding:13px;border-radius:12px;background:#f2efff}
+.banner strong{display:block;margin-bottom:5px}
+.banner span{font-size:12px;color:#666}
+.toolbar{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:0 14px 10px}
+#statusMessage{font-size:12px;color:#777}
+.small-button{background:white;border:1px solid var(--line);border-radius:8px;padding:7px;font-size:12px}
+#resultList{flex:1;overflow:auto;border-top:1px solid var(--line)}
+.result-item{display:flex;gap:11px;padding:13px;border-bottom:1px solid #eee;cursor:pointer}
+.result-item:hover{background:#faf9ff}
+.thumb{width:58px;height:58px;flex-shrink:0;display:grid;place-items:center;background:#f1efff;border-radius:12px;font-size:28px}
+.copy{min-width:0}
+.copy h3{font-size:14px;margin:2px 0 5px}
+.category{font-size:11px;color:var(--purple);margin-bottom:5px}
+.address{font-size:12px;color:#555;line-height:1.4}
+.date{font-size:11px;color:#b04b70;margin-top:6px;font-weight:bold}
+.pagination{display:flex;justify-content:center;gap:6px;padding:10px;border-top:1px solid var(--line)}
+.page-button{min-width:30px;height:30px;border:1px solid var(--line);border-radius:7px;background:white}
+.page-button.active{background:var(--purple);color:white}
+.page-button:disabled{opacity:.4}
+.map-wrap{position:relative;flex:1;min-width:0}
+#map,#roadview{position:absolute;inset:0;width:100%;height:100%}
+#roadview{display:none}
+.map-controls{position:absolute;right:12px;top:12px;z-index:1;display:flex;flex-direction:column;gap:8px}
+.map-control{padding:10px;background:white;border:1px solid #ddd;border-radius:9px;box-shadow:0 2px 8px #0001}
+.tip{position:absolute;bottom:12px;left:12px;padding:10px;background:#ffffffed;border-radius:9px;font-size:12px;color:#666}
+.modal-bg{position:fixed;inset:0;z-index:10;display:none;align-items:center;justify-content:center;padding:20px;background:#0007}
+.modal-bg.open{display:flex}
+.modal{width:min(420px,100%);background:white;border-radius:16px;overflow:hidden}
+.modal-hero{height:110px;display:grid;place-items:center;background:#f1efff;font-size:55px}
+.modal-body{padding:20px}
+.modal-body h2{margin:0 0 10px}
+.modal-body p{font-size:13px;line-height:1.6}
+.modal-actions{display:flex;gap:8px;margin-top:15px}
+.modal-actions a,.modal-actions button{flex:1;padding:10px;border:1px solid var(--line);border-radius:8px;text-align:center;text-decoration:none;color:var(--ink);background:white;font-size:12px}
+.modal-actions .primary-action{background:#fee500;border-color:#fee500}
+.close{float:right;border:0;background:white;font-size:22px}
+@media(max-width:700px){
+.sidebar{width:48%;max-width:48vw}
+header{padding:12px}
+h1{font-size:17px}
+.tabs{padding:7px;gap:5px}
+.tab{padding:8px 5px;font-size:11px}
+.banner{margin:7px;padding:9px}
+.result-item{padding:9px;gap:7px}
+.thumb{width:40px;height:44px;font-size:21px}
+.copy h3{font-size:12px}
+.address{font-size:10px}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <header>
+      <h1>🗺️ 덕질 지도</h1>
+      <div class="subtitle">좋아하는 취향을 찾아 떠나는 지도</div>
+      <form class="search-form" id="searchForm">
+        <input id="searchInput" placeholder="장소 또는 지역 검색" autocomplete="off">
+        <button class="primary" type="submit">검색</button>
+      </form>
+    </header>
+
+    <nav class="tabs">
+      <button class="tab active" data-category="anime">🎌 애니 덕질 매장</button>
+      <button class="tab" data-category="idol">🎤 아이돌 덕질 매장</button>
+      <button class="tab" data-category="manga">📚 만화방/만화카페</button>
+      <button class="tab" data-category="popup">🎪 팝업스토어</button>
+    </nav>
+
+    <section class="banner">
+      <strong id="bannerTitle">애니 덕질 매장</strong>
+      <span id="bannerDescription">애니 굿즈와 피규어를 찾아보세요.</span>
+    </section>
+
+    <div class="toolbar">
+      <div id="statusMessage">카카오맵을 불러오는 중입니다.</div>
+      <button class="small-button" id="refreshButton">다시 검색</button>
+    </div>
+    <div id="resultList"></div>
+    <div class="pagination" id="pagination"></div>
+  </aside>
+
+  <main class="map-wrap">
+    <div id="map"></div>
+    <div id="roadview"></div>
+    <div class="map-controls">
+      <button class="map-control" id="myLocationButton">📍 내 위치</button>
+      <button class="map-control" id="roadviewButton">🚶 로드뷰 보기</button>
+      <button class="map-control" id="mapButton" style="display:none">🗺️ 지도 보기</button>
+    </div>
+    <div class="tip" id="mapTip">마커를 누르면 상세 정보가 표시됩니다.</div>
+  </main>
+</div>
+
+<div class="modal-bg" id="detailModal">
+  <article class="modal">
+    <div class="modal-hero" id="modalHero">🎌</div>
+    <div class="modal-body">
+      <button class="close" id="modalClose">×</button>
+      <h2 id="modalTitle">장소 이름</h2>
+      <div class="category" id="modalCategory"></div>
+      <p id="modalAddress"></p>
+      <p id="modalDescription"></p>
+      <p id="modalDate"></p>
+      <div class="modal-actions" id="modalActions"></div>
+    </div>
+  </article>
+</div>
+
+<!-- 카카오 지도 SDK: 본인의 JavaScript 키를 사용하세요. -->
+<script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=26aea841520d993149bc4336c7c1c5b4&libraries=services&autoload=false"></script>
+<script>
+// 카테고리별 검색 설정
+const categoryConfig={
+  anime:{title:"애니 덕질 매장",icon:"🎌",description:"애니 굿즈, 피규어, 캐릭터 상품을 찾아보세요.",keywords:["애니메이트","애니 굿즈샵","피규어샵"],color:"#7465e8"},
+  idol:{title:"아이돌 덕질 매장",icon:"🎤",description:"앨범, 포토카드, 아이돌 굿즈 매장을 찾아보세요.",keywords:["아이돌 굿즈샵","케이팝 굿즈","음반 매장"],color:"#e45b9a"},
+  manga:{title:"만화방/만화카페",icon:"📚",description:"만화책을 읽고 쉴 수 있는 장소를 찾아보세요.",keywords:["만화카페","만화방"],color:"#269b83"},
+  popup:{title:"팝업스토어",icon:"🎪",description:"현재 진행 중이거나 앞으로 열릴 예정인 행사입니다.",keywords:[],color:"#e58b39"}
+};
+
+// 팝가 홍대·신촌 목록을 참고해 정리한 행사 예시입니다.
+// 일정과 장소는 변경될 수 있으므로 방문 전 출처와 공식 공지를 확인하세요.
+const popupEvents=[
+  {name:"주술회전 PLAZA 팝업",field:"anime",address:"서울 마포구 양화로 188",locationQuery:"주술회전 PLAZA 팝업 홍대 AK플라자",start:"2026-10-23",end:"2026-11-30",icon:"👊",description:"오픈 예정 행사입니다. 정확한 층과 입장 방식은 방문 전에 확인하세요.",source:"https://popga.co.kr/list/popup"},
+  {name:"프로세카×애니플러스 콜라보 카페",field:"anime",address:"서울 마포구 합정동",locationQuery:"프로세카 애니플러스 콜라보 카페 합정",start:"2026-10-08",end:"2026-11-22",icon:"🎤",description:"콜라보 카페 행사입니다. 정확한 주소와 운영 조건은 공식 공지에서 확인하세요.",source:"https://popga.co.kr/list/popup"},
+  {name:"타몬 군 × Gratte 카페 @홍대",field:"anime",address:"서울 마포구 양화로 188",locationQuery:"애니메이트 카페 홍대",start:"2026-09-19",end:"2026-11-01",icon:"💗",description:"애니메이트 카페 홍대점에서 진행되는 콜라보 카페입니다.",source:"https://popga.co.kr/en/popup/8883"},
+  {name:"마법소녀 마도카☆마기카 × 애니메이트 페어",field:"anime",address:"서울 마포구 양화로 188",locationQuery:"애니메이트 홍대점",start:"2026-09-24",end:"2026-10-18",icon:"✨",description:"매장 내 진행 위치와 재고는 현장 공지를 확인하세요.",source:"https://popga.co.kr/list/popup"},
+  {name:"하츠네 미쿠 × ART OF MIKU 팝업",field:"anime",address:"서울 마포구 홍대 일대",locationQuery:"하츠네 미쿠 ART OF MIKU 팝업 홍대",start:"2026-10-16",end:"2026-10-25",icon:"🩵",description:"정확한 장소는 행사 공지에서 확인하세요.",source:"https://popga.co.kr/list/popup"},
+  {name:"캐릭캐릭 체인지 팝업",field:"anime",address:"서울 마포구 홍대 일대",locationQuery:"캐릭캐릭 체인지 팝업 홍대 2026",start:"2026-10-16",end:"2026-10-29",icon:"🗝️",description:"방문 전 최신 행사 공지를 확인하세요.",source:"https://popga.co.kr/list/popup"},
+  {name:"타네무라 아리나 30주년 × 애니메이트 카페",field:"anime",address:"서울 마포구 양화로 188",locationQuery:"애니메이트 카페 홍대",start:"2026-11-20",end:"2026-12-15",icon:"🌸",description:"오픈 예정 콜라보 카페입니다. 세부 정보는 추후 공지를 확인하세요.",source:"https://popga.co.kr/list/popup"}
+];
+
+let map,placesService,geocoder,roadview,roadviewClient;
+let currentCategory="anime",currentResults=[],currentPage=1,markers=[],locationMarker=null;
+const pageSize=6;
+const resultList=document.getElementById("resultList");
+const statusMessage=document.getElementById("statusMessage");
+const searchInput=document.getElementById("searchInput");
+const pagination=document.getElementById("pagination");
+const detailModal=document.getElementById("detailModal");
+const mapElement=document.getElementById("map");
+const roadviewElement=document.getElementById("roadview");
+
+// 상태 메시지를 변경합니다.
+function setStatus(message){statusMessage.textContent=message}
+
+// 날짜 표시 형식을 바꿉니다.
+function formatDate(value){
+  const [year,month,day]=value.split("-");
+  return `${Number(year)}.${Number(month)}.${Number(day)}`;
+}
+
+// 팝업 일정의 진행 상태를 계산합니다.
+function getEventState(event){
+  const today=new Date();
+  today.setHours(0,0,0,0);
+  const start=new Date(event.start+"T00:00:00");
+  const end=new Date(event.end+"T23:59:59");
+  if(today<start)return "예정";
+  if(today<=end)return "진행 중";
+  return "종료";
+}
+
+// 카테고리를 변경합니다.
+function setCategory(category){
+  currentCategory=category;
+  currentPage=1;
+  document.querySelectorAll(".tab").forEach(button=>{
+    button.classList.toggle("active",button.dataset.category===category);
+  });
+  const config=categoryConfig[category];
+  document.getElementById("bannerTitle").textContent=config.title;
+  document.getElementById("bannerDescription").textContent=config.description;
+  searchInput.placeholder=category==="popup"?"팝업 이름 또는 지역 검색":"장소 또는 지역 검색";
+  if(category==="popup")searchPopups("");
+  else searchPlaces(searchInput.value.trim());
+}
+
+// 지도에 표시된 마커를 제거합니다.
+function clearMarkers(){
+  markers.forEach(marker=>marker.setMap(null));
+  markers=[];
+}
+
+// 카테고리별 이모지 마커 이미지를 만듭니다.
+function makeMarkerImage(emoji,color){
+  const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="54" height="64" viewBox="0 0 54 64">
+  <path d="M27 2C13 2 3 12 3 26c0 17 24 35 24 35s24-18 24-35C51 12 41 2 27 2z" fill="${color}" stroke="white" stroke-width="3"/>
+  <circle cx="27" cy="26" r="17" fill="white"/>
+  <text x="27" y="33" text-anchor="middle" font-size="19">${emoji}</text></svg>`;
+  return new kakao.maps.MarkerImage("data:image/svg+xml;charset=UTF-8,"+encodeURIComponent(svg),new kakao.maps.Size(54,64),{offset:new kakao.maps.Point(27,62)});
+}
+
+// 지도에 마커를 추가하고 클릭 이벤트를 연결합니다.
+function addMarker(place,category,isPopup=false){
+  const config=categoryConfig[category];
+  const position=new kakao.maps.LatLng(Number(place.y),Number(place.x));
+  const marker=new kakao.maps.Marker({
+    map,position,title:place.place_name||place.name,
+    image:makeMarkerImage(isPopup?"🎪":config.icon,config.color)
+  });
+  marker.placeData=place;
+  markers.push(marker);
+  kakao.maps.event.addListener(marker,"click",()=>{
+    if(isPopup)showPopupDetail(place.popupEvent||place);
+    else showPlaceDetail(place,category,marker);
+  });
+  return marker;
+}
+
+// 일반 매장 상세 정보를 표시합니다.
+function showPlaceDetail(place,category,marker){
+  const config=categoryConfig[category];
+  document.getElementById("modalHero").textContent=config.icon;
+  document.getElementById("modalTitle").textContent=place.place_name;
+  document.getElementById("modalCategory").textContent=config.title;
+  document.getElementById("modalAddress").textContent="📍 "+(place.road_address_name||place.address_name||"주소 정보 없음");
+  document.getElementById("modalDescription").textContent=place.category_name||"장소 상세 정보";
+  document.getElementById("modalDate").textContent=place.phone?"☎ "+place.phone:"";
+  const actions=document.getElementById("modalActions");
+  actions.replaceChildren();
+  const move=document.createElement("button");
+  move.className="primary-action";
+  move.textContent="지도에서 보기";
+  move.onclick=()=>{map.panTo(marker.getPosition());closeModal()};
+  actions.appendChild(move);
+  if(place.place_url){
+    const link=document.createElement("a");
+    link.href=place.place_url;link.target="_blank";link.rel="noopener noreferrer";
+    link.textContent="카카오맵 상세";actions.appendChild(link);
+  }
+  detailModal.classList.add("open");
+}
+
+// 팝업스토어 상세 정보를 표시합니다.
+function showPopupDetail(event){
+  document.getElementById("modalHero").textContent=event.icon||"🎪";
+  document.getElementById("modalTitle").textContent=event.name||event.place_name;
+  document.getElementById("modalCategory").textContent=(event.field==="anime"?"애니":"아이돌")+" 분야 · "+getEventState(event);
+  document.getElementById("modalAddress").textContent="📍 "+(event.address||"주소 확인 필요");
+  document.getElementById("modalDescription").textContent=event.description||"방문 전 공식 공지를 확인하세요.";
+  document.getElementById("modalDate").textContent=`📅 ${formatDate(event.start)} ~ ${formatDate(event.end)}`;
+  const actions=document.getElementById("modalActions");
+  actions.replaceChildren();
+  const locate=document.createElement("button");
+  locate.className="primary-action";locate.textContent="지도에서 위치 찾기";
+  locate.onclick=()=>locatePopup(event);actions.appendChild(locate);
+  const source=document.createElement("a");
+  source.href=event.source;source.target="_blank";source.rel="noopener noreferrer";
+  source.textContent="일정 출처 확인";actions.appendChild(source);
+  detailModal.classList.add("open");
+}
+
+// 상세 창을 닫습니다.
+function closeModal(){detailModal.classList.remove("open")}
+
+// 팝업 목록을 검색하고 지도 마커를 표시합니다.
+function searchPopups(query){
+  clearMarkers();
+  const normalized=query.toLowerCase();
+  const today=new Date();today.setHours(0,0,0,0);
+  currentResults=popupEvents.filter(event=>{
+    const matches=!normalized||(event.name+event.address+event.field).toLowerCase().includes(normalized);
+    const notEnded=new Date(event.end+"T23:59:59")>=today;
+    return matches&&notEnded;
+  }).sort((a,b)=>a.start.localeCompare(b.start));
+  currentPage=1;
+  renderResults();
+
+  currentResults.forEach(event=>{
+    placesService.keywordSearch(event.locationQuery,(data,status)=>{
+      if(status===kakao.maps.services.Status.OK&&data.length){
+        const found=data[0];
+        event.x=found.x;event.y=found.y;
+        addMarker({...found,place_name:event.name,popupEvent:event},"popup",true);
+      }else{
+        geocoder.addressSearch(event.address,(addresses,addressStatus)=>{
+          if(addressStatus===kakao.maps.services.Status.OK&&addresses[0]){
+            event.x=addresses[0].x;event.y=addresses[0].y;
+            addMarker({place_name:event.name,x:event.x,y:event.y,popupEvent:event},"popup",true);
+          }
+        });
+      }
+    });
+  });
+  const active=currentResults.filter(event=>getEventState(event)==="진행 중").length;
+  const upcoming=currentResults.filter(event=>getEventState(event)==="예정").length;
+  setStatus(`진행 중 ${active}개 · 예정 ${upcoming}개`);
+}
+
+// 팝업의 위치를 검색합니다.
+function locatePopup(event){
+  closeModal();
+  if(event.x&&event.y){
+    map.panTo(new kakao.maps.LatLng(Number(event.y),Number(event.x)));
+    map.setLevel(3);
+    return;
+  }
+  placesService.keywordSearch(event.locationQuery||event.name,(data,status)=>{
+    if(status===kakao.maps.services.Status.OK&&data[0]){
+      map.panTo(new kakao.maps.LatLng(Number(data[0].y),Number(data[0].x)));
+      map.setLevel(3);
+    }else{
+      setStatus("정확한 위치를 찾지 못했습니다. 공식 공지에서 주소를 확인하세요.");
+    }
+  });
+}
+
+// 카카오 장소 검색 API로 매장을 검색합니다.
+function searchPlaces(query){
+  if(!placesService||!map)return;
+  const config=categoryConfig[currentCategory];
+  const keyword=query||config.keywords[0];
+  if(!keyword)return;
+  clearMarkers();currentResults=[];currentPage=1;
+  resultList.replaceChildren();pagination.replaceChildren();
+  setStatus("장소를 검색하고 있습니다.");
+  placesService.keywordSearch(keyword,(data,status)=>{
+    if(status===kakao.maps.services.Status.OK){
+      currentResults=data;
+      renderResults();
+      const bounds=new kakao.maps.LatLngBounds();
+      data.forEach(place=>{
+        bounds.extend(new kakao.maps.LatLng(Number(place.y),Number(place.x)));
+        addMarker(place,currentCategory);
+      });
+      if(data.length)map.setBounds(bounds);
+      setStatus(`검색 결과 ${data.length}개 · ${config.title}`);
+    }else if(status===kakao.maps.services.Status.ZERO_RESULT){
+      currentResults=[];renderResults();clearMarkers();
+      setStatus("검색 결과가 없습니다. 다른 검색어를 입력해 보세요.");
+    }else{
+      setStatus("검색 오류가 발생했습니다. API 키와 도메인 설정을 확인하세요.");
+    }
+  },{location:map.getCenter(),sort:kakao.maps.services.SortBy.ACCURACY,size:15});
+}
+
+// 검색 결과와 페이지 이동 버튼을 표시합니다.
+function renderResults(){
+  resultList.replaceChildren();pagination.replaceChildren();
+  const totalPages=Math.max(1,Math.ceil(currentResults.length/pageSize));
+  currentPage=Math.min(currentPage,totalPages);
+  const pageItems=currentResults.slice((currentPage-1)*pageSize,currentPage*pageSize);
+  if(!pageItems.length){
+    const empty=document.createElement("div");
+    empty.style.padding="20px";
+    empty.textContent=currentCategory==="popup"?"표시할 팝업 일정이 없습니다.":"표시할 장소가 없습니다.";
+    resultList.appendChild(empty);
+  }
+
+  pageItems.forEach(item=>{
+    const isPopup=currentCategory==="popup";
+    const config=categoryConfig[currentCategory];
+    const card=document.createElement("article");
+    card.className="result-item";card.tabIndex=0;
+    const thumb=document.createElement("div");
+    thumb.className="thumb";thumb.textContent=isPopup?item.icon:config.icon;
+    const copy=document.createElement("div");copy.className="copy";
+    const title=document.createElement("h3");title.textContent=isPopup?item.name:item.place_name;
+    const category=document.createElement("div");category.className="category";
+    category.textContent=isPopup?`${item.field==="anime"?"애니":"아이돌"} 팝업 · ${getEventState(item)}`:(item.category_name||config.title);
+    const address=document.createElement("div");address.className="address";
+    address.textContent=isPopup?item.address:(item.road_address_name||item.address_name||"주소 정보 없음");
+    copy.append(title,category,address);
+    if(isPopup){
+      const date=document.createElement("div");date.className="date";
+      date.textContent=`${formatDate(item.start)} ~ ${formatDate(item.end)}`;
+      copy.appendChild(date);
+    }
+    card.append(thumb,copy);
+    card.addEventListener("click",()=>{
+      if(isPopup)showPopupDetail(item);
+      else{
+        const marker=markers.find(saved=>saved.placeData.id===item.id);
+        if(marker){map.panTo(marker.getPosition());showPlaceDetail(item,currentCategory,marker)}
+      }
+    });
+    card.addEventListener("keydown",event=>{
+      if(event.key==="Enter"||event.key===" "){event.preventDefault();card.click()}
+    });
+    resultList.appendChild(card);
+  });
+
+  if(totalPages>1){
+    const previous=document.createElement("button");
+    previous.className="page-button";previous.textContent="‹";
+    previous.disabled=currentPage===1;
+    previous.onclick=()=>{currentPage--;renderResults()};
+    pagination.appendChild(previous);
+    for(let page=1;page<=totalPages;page++){
+      const button=document.createElement("button");
+      button.className="page-button"+(page===currentPage?" active":"");
+      button.textContent=page;
+      button.onclick=()=>{currentPage=page;renderResults()};
+      pagination.appendChild(button);
+    }
+    const next=document.createElement("button");
+    next.className="page-button";next.textContent="›";
+    next.disabled=currentPage===totalPages;
+    next.onclick=()=>{currentPage++;renderResults()};
+    pagination.appendChild(next);
+  }
+}
+
+// 브라우저의 위치 권한을 요청하고 현재 위치로 이동합니다.
+function locateMe(){
+  if(!navigator.geolocation){setStatus("이 브라우저에서는 위치 기능을 지원하지 않습니다.");return}
+  setStatus("현재 위치를 확인하고 있습니다.");
+  navigator.geolocation.getCurrentPosition(position=>{
+    const location=new kakao.maps.LatLng(position.coords.latitude,position.coords.longitude);
+    map.setLevel(5);map.setCenter(location);
+    if(locationMarker)locationMarker.setMap(null);
+    locationMarker=new kakao.maps.Marker({map,position:location,title:"현재 위치",image:makeMarkerImage("📍","#3b82f6")});
+    setStatus("현재 위치로 이동했습니다.");
+  },error=>{
+    if(error.code===1)setStatus("위치 권한이 거부되었습니다. 브라우저 설정을 확인하세요.");
+    else setStatus("위치를 확인하지 못했습니다. HTTPS 또는 localhost에서 실행해 보세요.");
+  },{enableHighAccuracy:true,timeout:10000,maximumAge:60000});
+}
+
+// 지도와 로드뷰 화면을 전환합니다.
+function toggleRoadview(){
+  const showing=roadviewElement.style.display==="block";
+  if(showing){
+    roadviewElement.style.display="none";mapElement.style.display="block";
+    document.getElementById("roadviewButton").style.display="block";
+    document.getElementById("mapButton").style.display="none";
+    document.getElementById("mapTip").textContent="마커를 누르면 상세 정보가 표시됩니다.";
+    return;
+  }
+  const center=map.getCenter();
+  document.getElementById("roadviewButton").style.display="none";
+  document.getElementById("mapButton").style.display="block";
+  mapElement.style.display="none";roadviewElement.style.display="block";
+  roadviewClient.getNearestPanoId(center,1000,panoId=>{
+    if(panoId)roadview.setPanoId(panoId,center);
+    else document.getElementById("mapTip").textContent="이 주변에는 로드뷰가 없습니다.";
+  });
+}
+
+// 카카오맵 SDK가 준비된 다음 앱을 실행합니다.
+function initializeApp(){
+  map=new kakao.maps.Map(mapElement,{center:new kakao.maps.LatLng(37.566826,126.9786567),level:5});
+  placesService=new kakao.maps.services.Places(map);
+  geocoder=new kakao.maps.services.Geocoder();
+  roadview=new kakao.maps.Roadview(roadviewElement);
+  roadviewClient=new kakao.maps.RoadviewClient();
+
+  document.querySelectorAll(".tab").forEach(button=>{
+    button.addEventListener("click",()=>setCategory(button.dataset.category));
+  });
+  document.getElementById("searchForm").addEventListener("submit",event=>{
+    event.preventDefault();
+    const query=searchInput.value.trim();
+    if(currentCategory==="popup")searchPopups(query);
+    else searchPlaces(query);
+  });
+  document.getElementById("refreshButton").addEventListener("click",()=>{
+    if(currentCategory==="popup")searchPopups(searchInput.value.trim());
+    else searchPlaces(searchInput.value.trim());
+  });
+  document.getElementById("myLocationButton").addEventListener("click",locateMe);
+  document.getElementById("roadviewButton").addEventListener("click",toggleRoadview);
+  document.getElementById("mapButton").addEventListener("click",toggleRoadview);
+  document.getElementById("modalClose").addEventListener("click",closeModal);
+  detailModal.addEventListener("click",event=>{if(event.target===detailModal)closeModal()});
+  document.addEventListener("keydown",event=>{if(event.key==="Escape")closeModal()});
+
+  locateMe();
+  searchPlaces("");
+}
+
+function startApp(){
+  if(!window.kakao||!kakao.maps){
+    setStatus("카카오맵 SDK를 불러오지 못했습니다. JavaScript 키와 Web 도메인을 확인하세요.");
+    return;
+  }
+  kakao.maps.load(initializeApp);
+}
+
+const sdkScript=document.querySelector('script[src*="dapi.kakao.com/v2/maps/sdk.js"]');
+sdkScript.addEventListener("error",()=>setStatus("카카오맵 SDK 로드 실패: 키와 도메인 설정을 확인하세요."));
+if(window.kakao&&window.kakao.maps)startApp();
+else sdkScript.addEventListener("load",startApp);
+</script>
+</body>
+</html>
